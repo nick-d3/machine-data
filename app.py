@@ -1,6 +1,7 @@
 import csv
 import os
 import sqlite3
+import time
 from datetime import datetime, date
 from io import StringIO
 from pathlib import Path
@@ -8,12 +9,17 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, request, send_from_directory, Response
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).parent
 DB_PATH = Path(os.getenv("DB_PATH", BASE_DIR / "data" / "slips.db"))
 EXPORT_DIR = Path(os.getenv("EXPORT_DIR", BASE_DIR / "exports"))
+KIMAI_URL = os.getenv("KIMAI_URL")
+KIMAI_USER = os.getenv("KIMAI_USER")
+KIMAI_TOKEN = os.getenv("KIMAI_TOKEN")
+KIMAI_CACHE_TTL = int(os.getenv("KIMAI_CACHE_TTL", "300"))
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -117,6 +123,25 @@ def create_app() -> Flask:
             headers={"Content-Disposition": "attachment; filename=slips-export.csv"},
         )
 
+    @app.get("/api/kimai/clients")
+    def kimai_clients():
+        try:
+            clients = _kimai_get_clients()
+            return jsonify(clients)
+        except KimaiError as exc:
+            return jsonify({"error": str(exc)}), 502
+
+    @app.get("/api/kimai/projects")
+    def kimai_projects():
+        client_id = request.args.get("clientId")
+        if not client_id:
+            return jsonify({"error": "clientId is required"}), 400
+        try:
+            projects = _kimai_get_projects(client_id)
+            return jsonify(projects)
+        except KimaiError as exc:
+            return jsonify({"error": str(exc)}), 502
+
     return app
 
 
@@ -215,6 +240,73 @@ def _rows_to_csv(rows: list[dict]) -> str:
     for row in rows:
         writer.writerow({key: row.get(key, "") for key in fieldnames})
     return output.getvalue()
+
+
+# --- Kimai integration ---
+class KimaiError(Exception):
+    pass
+
+
+_kimai_cache: dict[str, dict] = {}
+
+
+def _kimai_get_clients() -> list[dict]:
+    cache_key = "clients"
+    cached = _kimai_cache.get(cache_key)
+    if cached and cached["expires_at"] > time.time():
+        return cached["data"]
+
+    data = _kimai_request("/api/clients")
+    # Kimai returns clients; filter inactive ones (visible flag)
+    clients = [
+        {"id": item.get("id"), "name": item.get("name")}
+        for item in data
+        if item.get("visible", True)
+    ]
+    clients.sort(key=lambda c: (c["name"] or "").lower())
+    _kimai_cache[cache_key] = {"data": clients, "expires_at": time.time() + KIMAI_CACHE_TTL}
+    return clients
+
+
+def _kimai_get_projects(client_id: str) -> list[dict]:
+    cache_key = f"projects:{client_id}"
+    cached = _kimai_cache.get(cache_key)
+    if cached and cached["expires_at"] > time.time():
+        return cached["data"]
+
+    data = _kimai_request(f"/api/projects?customer={client_id}")
+    projects = [
+        {"id": item.get("id"), "name": item.get("name")}
+        for item in data
+        if item.get("visible", True)
+    ]
+    projects.sort(key=lambda p: (p["name"] or "").lower())
+    _kimai_cache[cache_key] = {"data": projects, "expires_at": time.time() + KIMAI_CACHE_TTL}
+    return projects
+
+
+def _kimai_request(path: str) -> list[dict]:
+    if not (KIMAI_URL and KIMAI_USER and KIMAI_TOKEN):
+        raise KimaiError("Kimai is not configured (missing KIMAI_URL, KIMAI_USER, KIMAI_TOKEN)")
+
+    url = f"{KIMAI_URL.rstrip('/')}{path}"
+    headers = {
+        "X-AUTH-USER": KIMAI_USER,
+        "X-AUTH-TOKEN": KIMAI_TOKEN,
+        "Accept": "application/json",
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+    except requests.RequestException as exc:
+        raise KimaiError(f"Kimai request failed: {exc}") from exc
+
+    if resp.status_code >= 400:
+        raise KimaiError(f"Kimai error {resp.status_code}: {resp.text}")
+
+    try:
+        return resp.json()
+    except Exception as exc:  # json decode
+        raise KimaiError("Invalid JSON from Kimai") from exc
 
 
 if __name__ == "__main__":

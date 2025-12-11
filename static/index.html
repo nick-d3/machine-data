@@ -119,6 +119,18 @@
           <label for="foreman">Foreman</label>
           <input type="text" id="foreman" name="foreman" />
         </div>
+        <div>
+          <label for="client">Client (Kimai)</label>
+          <select id="client" name="client">
+            <option value="">Select client</option>
+          </select>
+        </div>
+        <div>
+          <label for="project">Project (Kimai)</label>
+          <select id="project" name="project">
+            <option value="">Select project</option>
+          </select>
+        </div>
         <div class="full-width">
           <label for="job">Job</label>
           <input type="text" id="job" name="job" required />
@@ -188,6 +200,8 @@
     const statusText = document.getElementById('statusText');
     const tableBody = document.getElementById('slipTableBody');
     const exportBtn = document.getElementById('exportBtn');
+    const clientSelect = document.getElementById('client');
+    const projectSelect = document.getElementById('project');
 
     function setStatus(message, type = '') {
       statusText.textContent = message;
@@ -268,6 +282,57 @@
       window.location.href = '/api/slips/export.csv';
     });
 
+    async function fetchClients() {
+      try {
+        const res = await fetch('/api/kimai/clients');
+        if (!res.ok) throw new Error('Failed to load clients');
+        const clients = await res.json();
+        clientSelect.innerHTML = '<option value=\"\">Select client</option>';
+        clients.forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          clientSelect.appendChild(opt);
+        });
+      } catch (err) {
+        console.error(err);
+        setStatus('Kimai clients unavailable', 'error');
+      }
+    }
+
+    async function fetchProjects(clientId) {
+      try {
+        const res = await fetch(`/api/kimai/projects?clientId=${encodeURIComponent(clientId)}`);
+        if (!res.ok) throw new Error('Failed to load projects');
+        const projects = await res.json();
+        projectSelect.innerHTML = '<option value=\"\">Select project</option>';
+        projects.forEach((p) => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name;
+          projectSelect.appendChild(opt);
+        });
+      } catch (err) {
+        console.error(err);
+        setStatus('Kimai projects unavailable', 'error');
+      }
+    }
+
+    clientSelect.addEventListener('change', (e) => {
+      const clientId = e.target.value;
+      projectSelect.innerHTML = '<option value=\"\">Select project</option>';
+      if (clientId) {
+        fetchProjects(clientId);
+      }
+    });
+
+    projectSelect.addEventListener('change', (e) => {
+      const projectName = e.target.selectedOptions[0]?.textContent || '';
+      if (projectName && (!form.job.value || form.job.value === form.job.placeholder)) {
+        form.job.value = projectName;
+      }
+    });
+
     function setDefaults() {
       const today = new Date().toISOString().slice(0, 10);
       if (!form.date.value) form.date.value = today;
@@ -275,6 +340,7 @@
 
     setDefaults();
     fetchSlips();
+    fetchClients();
   </script>
 </body>
 </html>
