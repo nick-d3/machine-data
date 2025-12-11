@@ -19,6 +19,7 @@ EXPORT_DIR = Path(os.getenv("EXPORT_DIR", BASE_DIR / "exports"))
 KIMAI_URL = os.getenv("KIMAI_URL")
 KIMAI_USER = os.getenv("KIMAI_USER")
 KIMAI_TOKEN = os.getenv("KIMAI_TOKEN")
+KIMAI_AUTH = os.getenv("KIMAI_AUTH", "token").lower()  # token | xauth
 KIMAI_CACHE_TTL = int(os.getenv("KIMAI_CACHE_TTL", "300"))
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -250,14 +251,30 @@ class KimaiError(Exception):
 _kimai_cache: dict[str, dict] = {}
 
 
+def _kimai_headers() -> dict[str, str]:
+    """
+    Support both Bearer token (no username) and Kimai's X-AUTH headers.
+    Default is Bearer unless KIMAI_AUTH=xauth.
+    """
+    headers = {"Accept": "application/json"}
+    if KIMAI_AUTH == "xauth":
+        if not KIMAI_USER:
+            raise KimaiError("KIMAI_USER required for xauth mode")
+        headers.update({"X-AUTH-USER": KIMAI_USER, "X-AUTH-TOKEN": KIMAI_TOKEN})
+    else:
+        headers.update({"Authorization": f"Bearer {KIMAI_TOKEN}"})
+    return headers
+
+
 def _kimai_get_clients() -> list[dict]:
     cache_key = "clients"
     cached = _kimai_cache.get(cache_key)
     if cached and cached["expires_at"] > time.time():
         return cached["data"]
 
-    data = _kimai_request("/api/clients")
-    # Kimai returns clients; filter inactive ones (visible flag)
+    # Kimai uses 'customers' for clients
+    data = _kimai_request("/api/customers")
+    # Filter visible only
     clients = [
         {"id": item.get("id"), "name": item.get("name")}
         for item in data
@@ -286,15 +303,11 @@ def _kimai_get_projects(client_id: str) -> list[dict]:
 
 
 def _kimai_request(path: str) -> list[dict]:
-    if not (KIMAI_URL and KIMAI_USER and KIMAI_TOKEN):
-        raise KimaiError("Kimai is not configured (missing KIMAI_URL, KIMAI_USER, KIMAI_TOKEN)")
+    if not (KIMAI_URL and KIMAI_TOKEN):
+        raise KimaiError("Kimai is not configured (missing KIMAI_URL or KIMAI_TOKEN)")
 
     url = f"{KIMAI_URL.rstrip('/')}{path}"
-    headers = {
-        "X-AUTH-USER": KIMAI_USER,
-        "X-AUTH-TOKEN": KIMAI_TOKEN,
-        "Accept": "application/json",
-    }
+    headers = _kimai_headers()
     try:
         resp = requests.get(url, headers=headers, timeout=10)
     except requests.RequestException as exc:
