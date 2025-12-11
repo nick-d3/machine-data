@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Truck Slips</title>
+  <style>
+    :root {
+      --bg: #0e1117;
+      --panel: #161b22;
+      --border: #2d333b;
+      --text: #e6edf3;
+      --muted: #9ea7b3;
+      --accent: #3b82f6;
+      --danger: #ef4444;
+      --success: #10b981;
+      --input-bg: #0e1117;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 20% 20%, #1d2430, #0b0f16 60%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(14, 17, 23, 0.92);
+      backdrop-filter: blur(6px);
+      z-index: 10;
+    }
+    h1 { margin: 0; font-size: 20px; letter-spacing: 0.5px; }
+    main { padding: 20px; display: grid; gap: 16px; max-width: 1200px; margin: 0 auto; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin-bottom: 6px; }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    .full-width { grid-column: 1 / -1; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    button.primary {
+      background: linear-gradient(135deg, #4f8bff, #2563eb);
+      color: #fff;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.35);
+    }
+    button.secondary { background: var(--border); color: var(--text); }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    .status { font-size: 14px; color: var(--muted); }
+    .status.success { color: var(--success); }
+    .status.error { color: var(--danger); }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; }
+    th { color: var(--muted); font-weight: 600; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    @media (max-width: 720px) {
+      header, main { padding: 16px; }
+      form { grid-template-columns: 1fr; }
+      .actions { flex-direction: column; align-items: stretch; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Truck Slip Entry</h1>
+    <div class="actions">
+      <button class="secondary" id="exportBtn" type="button">Download CSV</button>
+      <span class="status" id="statusText"></span>
+    </div>
+  </header>
+  <main>
+    <section class="card">
+      <h2 style="margin-top:0;margin-bottom:12px;font-size:16px;">New Slip</h2>
+      <form id="slipForm">
+        <div>
+          <label for="date">Date</label>
+          <input type="date" id="date" name="date" required />
+        </div>
+        <div>
+          <label for="driver">Driver</label>
+          <input type="text" id="driver" name="driver" required />
+        </div>
+        <div>
+          <label for="truck_number">Truck #</label>
+          <input type="text" id="truck_number" name="truck_number" required />
+        </div>
+        <div>
+          <label for="foreman">Foreman</label>
+          <input type="text" id="foreman" name="foreman" />
+        </div>
+        <div class="full-width">
+          <label for="job">Job</label>
+          <input type="text" id="job" name="job" required />
+        </div>
+        <div>
+          <label for="haul_from">Haul From</label>
+          <input type="text" id="haul_from" name="haul_from" />
+        </div>
+        <div>
+          <label for="haul_to">Haul To</label>
+          <input type="text" id="haul_to" name="haul_to" required />
+        </div>
+        <div>
+          <label for="start_time">Start Time</label>
+          <input type="time" id="start_time" name="start_time" required />
+        </div>
+        <div>
+          <label for="end_time">End Time</label>
+          <input type="time" id="end_time" name="end_time" required />
+        </div>
+        <div>
+          <label for="material">Material</label>
+          <input type="text" id="material" name="material" required />
+        </div>
+        <div>
+          <label for="signature_name">Signature (typed)</label>
+          <input type="text" id="signature_name" name="signature_name" required />
+        </div>
+        <div class="full-width">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" placeholder="Optional"></textarea>
+        </div>
+        <div class="full-width actions">
+          <button class="primary" type="submit">Save Slip</button>
+          <button class="secondary" type="reset">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;font-size:16px;">Recent Slips</h2>
+        <small style="color:var(--muted);">Latest 100</small>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Driver</th>
+              <th>Truck</th>
+              <th>Job</th>
+              <th>Haul To</th>
+              <th>Hours</th>
+              <th>Material</th>
+              <th>Signature</th>
+            </tr>
+          </thead>
+          <tbody id="slipTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById('slipForm');
+    const statusText = document.getElementById('statusText');
+    const tableBody = document.getElementById('slipTableBody');
+    const exportBtn = document.getElementById('exportBtn');
+
+    function setStatus(message, type = '') {
+      statusText.textContent = message;
+      statusText.className = `status ${type}`;
+    }
+
+    function formDataToJSON(formElement) {
+      const data = new FormData(formElement);
+      const obj = {};
+      for (const [key, value] of data.entries()) {
+        obj[key] = value.trim();
+      }
+      return obj;
+    }
+
+    async function fetchSlips() {
+      try {
+        const res = await fetch('/api/slips');
+        const slips = await res.json();
+        renderTable(slips);
+      } catch (err) {
+        console.error(err);
+        setStatus('Failed to load slips', 'error');
+      }
+    }
+
+    function renderTable(slips) {
+      tableBody.innerHTML = '';
+      slips.forEach((slip) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${slip.date || ''}</td>
+          <td>${slip.driver || ''}</td>
+          <td>${slip.truck_number || ''}</td>
+          <td>${slip.job || ''}</td>
+          <td>${slip.haul_to || ''}</td>
+          <td>${slip.start_time || ''} - ${slip.end_time || ''}</td>
+          <td>${slip.material || ''}</td>
+          <td>${slip.signature_name || ''}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      setStatus('Saving...');
+      const payload = formDataToJSON(form);
+
+      if (payload.start_time && payload.end_time && payload.start_time >= payload.end_time) {
+        setStatus('Start time must be before end time', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/slips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const msg = await res.json();
+          setStatus(msg.error || 'Failed to save', 'error');
+          return;
+        }
+        await res.json();
+        setStatus('Saved', 'success');
+        form.reset();
+        setDefaults();
+        fetchSlips();
+      } catch (err) {
+        console.error(err);
+        setStatus('Failed to save', 'error');
+      }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      window.location.href = '/api/slips/export.csv';
+    });
+
+    function setDefaults() {
+      const today = new Date().toISOString().slice(0, 10);
+      if (!form.date.value) form.date.value = today;
+    }
+
+    setDefaults();
+    fetchSlips();
+  </script>
+</body>
+</html>
